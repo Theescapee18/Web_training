@@ -62,7 +62,7 @@ CI/CD 依赖服务器上的一次性配置：**创建 deploy 用户 → 生成�
 | `SERVER_HOST` | 服务器 IP/域名 |
 | `SERVER_PORT` | SSH 端口（默认 22） |
 | `DEPLOY_USER` | 非 root 部署用户（如 `deploy`） |
-| `DEPLOY_PATH` | 站点根目录（如 `/var/www/Web_training/`） |
+| `DEPLOY_PATH` | 站点根目录，**不带结尾斜杠**（如 `/var/www/Web_training`） |
 | `SSH_PRIVATE_KEY` | CI/CD 专用 SSH 私钥内容 |
 
 ## 安全要点

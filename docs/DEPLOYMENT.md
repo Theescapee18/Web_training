@@ -132,7 +132,7 @@ ssh -i ./deploy_key -o StrictHostKeyChecking=accept-new deploy@<服务器IP> "ec
 | `SERVER_HOST`   | 服务器公网 IP 或域名                                          |
 | `SERVER_PORT`   | SSH 端口，通常 `22`                                           |
 | `DEPLOY_USER`   | `deploy`                                                       |
-| `DEPLOY_PATH`   | `/var/www/Web_training/` （注意结尾的 `/`，见下方 rsync 语义） |
+| `DEPLOY_PATH`   | `/var/www/Web_training` （**不带结尾 `/`**，工作流会拼成 `<DEPLOY_PATH>/<成员>/`） |
 | `SSH_PRIVATE_KEY` | 打开 `deploy_key`（私钥文件），**粘贴完整内容含首尾两行**     |
 
 私钥粘贴示例（整段复制，包括空行）：
@@ -142,9 +142,12 @@ b3BlbnNzaC1rZXktdjEAAAAA...(多行Base64)...
 -----END OPENSSH PRIVATE KEY-----
 ```
 
-> ⚠️ **`DEPLOY_PATH` 结尾斜杠的含义**：workflow 里 `rsync site/ deploy@host:/var/www/Web_training/`
-> 结尾带 `/` 表示“把 site 目录**里面的内容**同步进去”，结果就是 `/var/www/Web_training/index.html`、
-> `/var/www/Web_training/TMF/...`。若漏掉斜杠会变成多套一层 `Web_training/site/`。
+> ⚠️ **部署隔离（重要）**：工作流已**不再**对整棵 `site/` 做 `rsync --delete`，
+> 而是遍历 `site/*/` 每个成员目录，分别同步到 `<DEPLOY_PATH>/<成员>/`，
+> `--delete` **只在该成员子目录内生效**，同步前还会把将被覆盖/删除的文件
+> 备份到服务器 `/home/deploy/backups/<时间戳>/<成员>/`。因此**部署某个成员
+> 永远不会波及其他人的线上内容**，误删也可从备份还原。`DEPLOY_PATH` 因此
+> **不带**结尾斜杠（nginx 侧的 `alias /var/www/Web_training/;` 仍需带斜杠，两者独立）。
 
 ---
 
