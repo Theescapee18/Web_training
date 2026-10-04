@@ -1,0 +1,26 @@
+# =====================================================================
+# CODEOWNERS —— 按成员划分审批权，避免"只有一个人能拍板"
+# ---------------------------------------------------------------------
+# 作用：配合 main 分支保护里的 "Require review from Code Owners"，
+#       某个目录被改动时，必须由其 owner 审批才能合并。
+#
+# 使用前提：
+#   1) 把下面 @占位 换成成员真实的 GitHub 用户名（@octocat 这种）；
+#   2) 成员已作为 Collaborator(Write) 加入本仓库；
+#   3) 在 main 的分支保护规则中勾选 "Require review from Code Owners"。
+#
+# 语法：每行一个路径 + owner；owner 也可换成组织/团队。
+# =====================================================================
+
+# 站点导航首页：三人共同负责（合并需他们任一非作者成员审批）
+/site/index.html   @OWNER_TMF @OWNER_YLX @OWNER_ZLY
+
+# 各成员只对自己的目录拥有审批权
+/site/TMF/         @OWNER_TMF
+/site/YLX/         @OWNER_YLX
+/site/ZLY/         @OWNER_ZLY
+
+# CI/CD 与 Nginx 基础设施：改动需全体核心成员之一审批
+/.github/          @OWNER_TMF
+/nginx/            @OWNER_TMF
+/docs/             @OWNER_TMF

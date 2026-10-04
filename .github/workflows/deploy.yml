@@ -1,0 +1,57 @@
+# =====================================================================
+# 自动化部署工作流：把 site/ 目录下的静态页面推送到 Nginx 服务器
+# ---------------------------------------------------------------------
+# 触发条件：推送到 main 分支且改动位于 site/ 下，或手动触发。
+# 部署方式：GitHub Actions 通过 SSH + rsync，使用「专用部署用户」登录，
+#           因此无需共享 root 密码。
+#
+# 需要在 GitHub 仓库配置以下 Secrets（Settings → Secrets and variables
+# → Actions → New repository secret）：
+#   SERVER_HOST     服务器 IP 或域名
+#   SERVER_PORT     SSH 端口（通常是 22）
+#   DEPLOY_USER     服务器上的非 root 部署用户（如 deploy）
+#   DEPLOY_PATH     站点根目录（需与 nginx root 一致，如 /var/www/Web_training/）
+#   SSH_PRIVATE_KEY CI/CD 专用的 SSH 私钥（见 docs/DEPLOYMENT.md）
+# =====================================================================
+
+name: Deploy Static Site
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'site/**'
+  workflow_dispatch: {}   # 允许在 Actions 页面手动触发
+
+jobs:
+  deploy:
+    name: rsync deploy to nginx
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH (private key + known_hosts)
+        run: |
+          mkdir -p ~/.ssh
+          # 写入 CI/CD 专用私钥
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # 预置服务器主机指纹，避免交互式确认
+          ssh-keyscan -p "${{ secrets.SERVER_PORT }}" -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Sync site/ to server with rsync
+        run: |
+          rsync -avz --delete \
+            --human-readable \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT }} -o StrictHostKeyChecking=yes" \
+            site/ \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_PATH }}"
+
+      - name: Verify deployment (optional remote check)
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${{ secrets.SERVER_PORT }}" \
+            -o StrictHostKeyChecking=yes \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.SERVER_HOST }}" \
+            "echo 'Deployed files:' && ls -la ${{ secrets.DEPLOY_PATH }}"
