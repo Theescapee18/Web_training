@@ -42,13 +42,22 @@ jobs:
 
       - name: Prepare SSH (private key + known_hosts)
         run: |
+          # 先断言关键 Secrets 非空，避免空值导致难懂的报错
+          if [ -z "${{ secrets.SERVER_HOST }}" ] || [ -z "${{ secrets.SERVER_PORT }}" ] || [ -z "${{ secrets.DEPLOY_USER }}" ] || [ -z "${{ secrets.DEPLOY_PATH }}" ]; then
+            echo "::error::缺失 SERVER_HOST / SERVER_PORT / DEPLOY_USER / DEPLOY_PATH 中的某个 Secret"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "::error::SSH_PRIVATE_KEY 为空，请完整粘贴 deploy_key 私钥内容"
+            exit 1
+          fi
           mkdir -p "$HOME/.ssh"
           KEY="$HOME/.ssh/deploy_key"
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > "$KEY"
           chmod 600 "$KEY"
-          # 幂等预置主机指纹（先移掉旧项再写入，避免重复）
+          # 幂等预置主机指纹（先移掉旧项再写入）；连不上时不在此处硬失败，交由后续 rsync 暴露真实错误
           ssh-keygen -R "${{ secrets.SERVER_HOST }}" >/dev/null 2>&1 || true
-          ssh-keyscan -p "${{ secrets.SERVER_PORT }}" -H "${{ secrets.SERVER_HOST }}" >> "$HOME/.ssh/known_hosts" 2>/dev/null
+          ssh-keyscan -p "${{ secrets.SERVER_PORT }}" -H "${{ secrets.SERVER_HOST }}" >> "$HOME/.ssh/known_hosts" 2>/dev/null || echo "警告: ssh-keyscan 未能获取主机指纹（服务器 22 端口可能不对 GitHub runner 开放）"
 
       - name: Deploy each member directory (isolated, per-dir backup)
         env:
