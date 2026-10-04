@@ -42,17 +42,22 @@ jobs:
 
       - name: Prepare SSH (private key + known_hosts)
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p "${{ secrets.SERVER_PORT }}" -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          mkdir -p "$HOME/.ssh"
+          KEY="$HOME/.ssh/deploy_key"
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > "$KEY"
+          chmod 600 "$KEY"
+          # 幂等预置主机指纹（先移掉旧项再写入，避免重复）
+          ssh-keygen -R "${{ secrets.SERVER_HOST }}" >/dev/null 2>&1 || true
+          ssh-keyscan -p "${{ secrets.SERVER_PORT }}" -H "${{ secrets.SERVER_HOST }}" >> "$HOME/.ssh/known_hosts" 2>/dev/null
 
       - name: Deploy each member directory (isolated, per-dir backup)
         env:
-          RSH: "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SERVER_PORT }} -o StrictHostKeyChecking=yes"
           DEST: "${{ secrets.DEPLOY_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_PATH }}"
         run: |
           set -euo pipefail
+          # rsync 的 -e 不会用 shell 解析，必须传【绝对路径】，不能写 ~
+          KEY="$HOME/.ssh/deploy_key"
+          RSH="ssh -i $KEY -p ${{ secrets.SERVER_PORT }} -o StrictHostKeyChecking=yes"
           TS="$(date -u +%Y%m%d%H%M%S)"
           BK="/home/${{ secrets.DEPLOY_USER }}/backups/${TS}"   # 站点根之外的备份位置
 
@@ -78,7 +83,7 @@ jobs:
 
       - name: Verify deployment (remote tree listing)
         run: |
-          ssh -i ~/.ssh/deploy_key -p "${{ secrets.SERVER_PORT }}" \
+          ssh -i "$HOME/.ssh/deploy_key" -p "${{ secrets.SERVER_PORT }}" \
             -o StrictHostKeyChecking=yes \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.SERVER_HOST }}" \
             "echo '--- served root ---'; ls -la '${{ secrets.DEPLOY_PATH }}'; \
