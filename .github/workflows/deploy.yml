@@ -53,8 +53,16 @@ jobs:
           fi
           mkdir -p "$HOME/.ssh"
           KEY="$HOME/.ssh/deploy_key"
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > "$KEY"
+          # 用 tr -d '\r' 去除 Windows 粘贴可能带入的 CRLF；printf 保证结尾有换行
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > "$KEY"
           chmod 600 "$KEY"
+          # 快速校验：私钥可被加载并导出公钥，否则在此用中文报错，别拖到 rsync 才失败
+          if ! ssh-keygen -y -f "$KEY" >/dev/null 2>&1; then
+            echo "::error::SSH_PRIVATE_KEY 不是有效私钥（很可能粘贴时丢了换行/首尾两行，或粘成了别的密钥）。请在 GitHub Secrets 里用 deploy_key 文件全文重新覆盖。"
+            exit 1
+          fi
+          echo "私钥校验通过，指纹："
+          ssh-keygen -y -f "$KEY" | ssh-keygen -lf -
           # 幂等预置主机指纹（先移掉旧项再写入）；连不上时不在此处硬失败，交由后续 rsync 暴露真实错误
           ssh-keygen -R "${{ secrets.SERVER_HOST }}" >/dev/null 2>&1 || true
           ssh-keyscan -p "${{ secrets.SERVER_PORT }}" -H "${{ secrets.SERVER_HOST }}" >> "$HOME/.ssh/known_hosts" 2>/dev/null || echo "警告: ssh-keyscan 未能获取主机指纹（服务器 22 端口可能不对 GitHub runner 开放）"
